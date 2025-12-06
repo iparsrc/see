@@ -1,8 +1,12 @@
+## Group 2
+```sh
+cd infrastructure
 mkdir data
-vagrant up
-vagnrat ssh
+mkdir data-staging
+mkdir data-prod
 
----
+
+vagrant ssh
 sudo mkdir -p /srv/gitlab-runner/config  
 sudo docker run -d --name gitlab-runner --restart always \
   -v /srv/gitlab-runner/config:/etc/gitlab-runner \
@@ -11,5 +15,4 @@ sudo docker run -d --name gitlab-runner --restart always \
 sudo docker run --rm -it \
   -v /srv/gitlab-runner/config:/etc/gitlab-runner \
   gitlab/gitlab-runner:latest register  
-
-  hello
+```

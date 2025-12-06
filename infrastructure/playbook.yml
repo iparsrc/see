@@ -40,10 +40,8 @@
     - name: Install Docker Engine
       apt:
         name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-        state: latest
+          - docker.io
+        state: present
         update_cache: yes
 
     - name: Enable/start Docker
