@@ -1,1 +1,2 @@
-data/
+infrastructure/data/
+infrastructure/.vagrant/

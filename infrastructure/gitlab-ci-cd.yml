@@ -1,8 +1,10 @@
 stages:
   - backend-build
   - backend-test
+  - frontned-build
+  - frontend-test
 
-main_backend_build:
+backend_build:
   stage: backend-build
   image: gradle:8.3
   tags: [docker]
@@ -11,7 +13,7 @@ main_backend_build:
         - backend/**/* 
   script: cd backend && gradle --build-cache clean build bootJar
 
-main_backend_test:
+backend_test:
   stage: backend-test
   image: gradle:8.3
   tags: [docker]
@@ -19,3 +21,21 @@ main_backend_test:
     - changes:
         - backend/**/* 
   script: cd backend && gradle clean check
+
+frontend_build:
+  stage: frontend-build
+  image: node:22
+  tags: [docker]
+  rules:
+    - changes:
+        - frontend/**/* 
+  script: cd frontend && npm install && npm run build
+
+frontend_test:
+  stage: frontend-test
+  image: node:22
+  tags: [docker]
+  rules:
+    - changes:
+        - frontend/**/* 
+  script: cd frontend && npm install && npm run test
