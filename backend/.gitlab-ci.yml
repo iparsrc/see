@@ -29,7 +29,7 @@ pre-build:
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: ubuntu:latest
   stage: pre-build
-  tags: [e4l-server]
+  tags: ["@backend"]
   script: apt-get update; apt-get --yes install gettext moreutils;envsubst < $PROPERTIES | sponge $PROPERTIES
   cache:
     key: "$CI_COMMIT_REF_NAME"
@@ -48,7 +48,7 @@ build:
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: gradle:8.3
   stage: build
-  tags: [e4l-server]
+  tags: ["@backend"]
   script: gradle --build-cache clean build bootJar
   cache:
     key: "$CI_COMMIT_REF_NAME"
@@ -63,7 +63,7 @@ test:
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: gradle:8.3
   stage: test
-  tags: [e4l-server]
+  tags: ["@backend"]
   script: gradle clean check
   cache:
     key: "$CI_COMMIT_REF_NAME"
@@ -78,7 +78,7 @@ docker:
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: docker:latest
   stage: docker build
-  tags: [e4l-server]
+  tags: ["@backend"]
   script:
   #- docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASSWORD"
   - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
@@ -100,7 +100,7 @@ db_backup_staging:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: docker:latest
   stage: backup db staging
-  tags: [juno]
+  tags: ["@backend"]
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - DB_OUT_FILENAME=e4l-$CURRENT_DATETIME.sql
@@ -112,7 +112,7 @@ deploy_staging:
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: tmaier/docker-compose:latest
   stage: deploy staging
-  tags: [juno]
+  tags: ["@backend"]
   script:
   #- docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASSWORD"
   - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
@@ -129,7 +129,7 @@ db_backup_preprod:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: docker:latest
   stage: backup db pre-prod
-  tags: [e4l-server]
+  tags: ["@backend"]
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - DB_OUT_FILENAME=e4l-$CURRENT_DATETIME.sql
@@ -140,7 +140,7 @@ deploy_preprod:
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: tmaier/docker-compose:latest
   stage: deploy pre-prod
-  tags: [e4l-server]
+  tags: ["@backend"]
   script:
     #- docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASSWORD"
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
@@ -157,7 +157,7 @@ deploy_preprod:
 prepare-user:
   stage: test pre-prod
   image: docker:latest
-  tags: [e4l-server] 
+  tags: ["@backend"] 
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - docker exec e4l-db bash -c "mysql -u$MYSQL_USERNAME -p$MYSQL_PASSWORD -e 'UPDATE user SET password=\"$FAKE_PASSWORD\" WHERE email=\"$ADMIN_EMAIL\";' e4lPreprod"
@@ -167,7 +167,7 @@ automated-api-tests:
  image: 
     name: postman/newman
     entrypoint: [""]
- tags: [e4l-server]  
+ tags: ["@backend"]  
  script:
    - newman run "https://api.postman.com/collections/15310155-b40ac70f-db06-4ad4-95a4-229187c0e4d1?apikey=$POSTMAN_API_KEY" --environment "https://api.getpostman.com/environments/15310155-0df15703-da50-4b96-aa0e-7406842e8df0?apikey=$POSTMAN_API_KEY"
    - newman run "https://api.postman.com/collections/15310155-87c057c6-b97c-4665-ae47-91017862cbfb?apikey=$POSTMAN_API_KEY" --environment "https://api.getpostman.com/environments/15310155-0df15703-da50-4b96-aa0e-7406842e8df0?apikey=$POSTMAN_API_KEY"
@@ -181,7 +181,7 @@ automated-api-tests:
 return-user:
   stage: test pre-prod
   image: docker:latest
-  tags: [e4l-server] 
+  tags: ["@backend"] 
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - docker exec e4l-db bash -c "mysql -u$MYSQL_USERNAME -p$MYSQL_PASSWORD -e 'UPDATE user SET password=\"$ADMIN_PASSWORD_HASHED\" WHERE email=\"$ADMIN_EMAIL\";' e4lPreprod"
@@ -192,7 +192,7 @@ db_backup_prod:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: docker:latest
   stage: backup db prod
-  tags: [e4l-server]
+  tags: ["@backend"]
   when: manual
   script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
@@ -204,7 +204,7 @@ deploy_prod:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image: tmaier/docker-compose:latest
   stage: deploy prod
-  tags: [e4l-server]
+  tags: ["@backend"]
   when: manual
   script:
     #- docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASSWORD"

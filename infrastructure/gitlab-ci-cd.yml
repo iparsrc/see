@@ -1,0 +1,21 @@
+stages:
+  - backend-build
+  - backend-test
+
+main_backend_build:
+  stage: backend-build
+  image: gradle:8.3
+  tags: [docker]
+  rules:
+    - changes:
+        - backend/**/* 
+  script: cd backend && gradle --build-cache clean build bootJar
+
+main_backend_test:
+  stage: backend-test
+  image: gradle:8.3
+  tags: [docker]
+  rules:
+    - changes:
+        - backend/**/* 
+  script: cd backend && gradle clean check
