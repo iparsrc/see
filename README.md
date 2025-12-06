@@ -11,3 +11,4 @@ sudo docker run -d --name gitlab-runner --restart always \
 sudo docker run --rm -it \
   -v /srv/gitlab-runner/config:/etc/gitlab-runner \
   gitlab/gitlab-runner:latest register  
+  
