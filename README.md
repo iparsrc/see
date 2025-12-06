@@ -15,4 +15,10 @@ sudo docker run -d --name gitlab-runner --restart always \
 sudo docker run --rm -it \
   -v /srv/gitlab-runner/config:/etc/gitlab-runner \
   gitlab/gitlab-runner:latest register  
+
+
+cd infrastructure
+ssh-keygen -t ed25519 -C "gitlab-ci-deploy" -f "./ci_deploy" -N ""
+ssh-copy-id -i ./ci_deploy.pub vagrant@192.168.56.10
+ssh-copy-id -i ./ci_deploy.pub vagrant@192.168.56.11
 ```

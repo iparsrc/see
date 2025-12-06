@@ -1,41 +1,206 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - when: never
+
+variables:
+  # Required for Docker-in-Docker
+  DOCKER_TLS_CERTDIR: ""
+  GIT_STRATEGY: fetch
+  # Set these in GitLab CI/CD variables
+  # DEPLOY_USER: "vagrant"
+  # STAGING_HOST: "192.168.56.10"
+  # PRODUCTION_HOST: "192.168.56.11"
+  # SSH_PRIVATE_KEY: "<your private key>"
+
 stages:
   - backend-build
   - backend-test
-  - frontned-build
+  - frontend-build
   - frontend-test
+  - docker-build
+  - deploy-staging
+  - deploy-production
 
 backend_build:
   stage: backend-build
-  image: gradle:8.3
+  image: gradle:8.3-jdk-20
   tags: [docker]
   rules:
-    - changes:
-        - backend/**/* 
-  script: cd backend && gradle --build-cache clean build bootJar
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - backend/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - backend/**/*
+  script:
+    - cd backend
+    - gradle --build-cache clean build bootJar
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - backend/build/libs/*.jar
 
 backend_test:
   stage: backend-test
-  image: gradle:8.3
+  image: gradle:8.3-jdk-20
   tags: [docker]
   rules:
-    - changes:
-        - backend/**/* 
-  script: cd backend && gradle clean check
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - backend/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - backend/**/*
+  script:
+    - cd backend
+    - gradle clean check
 
 frontend_build:
   stage: frontend-build
   image: node:22
   tags: [docker]
   rules:
-    - changes:
-        - frontend/**/* 
-  script: cd frontend && npm install && npm run build
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - frontend/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - frontend/**/*
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - frontend/e4l.frontend.docker/web/dist/**
 
 frontend_test:
   stage: frontend-test
   image: node:22
   tags: [docker]
   rules:
-    - changes:
-        - frontend/**/* 
-  script: cd frontend && npm install && npm run test
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - frontend/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - frontend/**/*
+  script:
+    - cd frontend
+    - npm ci
+    - npm run test --if-present
+
+docker_build_frontend:
+  stage: docker-build
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      alias: docker
+  tags: [docker]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - frontend/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - frontend/**/*
+  needs:
+    - job: frontend_build
+      artifacts: true
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build --pull -t "$CI_REGISTRY_IMAGE:latest" ./frontend/e4l.frontend.docker/web
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker push "$CI_REGISTRY_IMAGE:latest"
+        docker tag "$CI_REGISTRY_IMAGE:latest" "$CI_REGISTRY_IMAGE:release"
+        docker push "$CI_REGISTRY_IMAGE:release"
+      else
+        docker push "$CI_REGISTRY_IMAGE:latest"
+      fi
+
+# Optional: backend image build (pushed with branch tag)
+docker_build_backend:
+  stage: docker-build
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      alias: docker
+  tags: [docker]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      changes:
+        - backend/**/*
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - backend/**/*
+  needs:
+    - job: backend_build
+      artifacts: true
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - cd backend
+    # Ensure the expected jar name exists for the Dockerfile (adjust if needed)
+    - |
+      JAR_SRC="$(ls build/libs/*.jar | head -n1)"
+      echo "Using jar: $JAR_SRC"
+      cp "$JAR_SRC" build/libs/e4l-server.jar
+    - docker build --pull -t "$CI_REGISTRY_IMAGE/backend:${CI_COMMIT_BRANCH}" .
+    - docker push "$CI_REGISTRY_IMAGE/backend:${CI_COMMIT_BRANCH}"
+
+deploy_staging:
+  stage: deploy-staging
+  image: alpine:3.20
+  tags: [docker]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+  needs:
+    - docker_build_frontend
+  environment:
+    name: staging
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - printf "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+  script:
+    - ssh -i ~/.ssh/id_rsa -p 22 vagrant@192.168.56.10 "mkdir -p /opt/see/frontend"
+    - scp -i ~/.ssh/id_rsa -P 22 -r frontend/e4l.frontend.docker vagrant@192.168.56.10:/opt/see/frontend/
+    - >
+      ssh -i ~/.ssh/id_rsa -p 22 vagrant@192.168.56.10
+      "docker login -u '$CI_REGISTRY_USER' -p '$CI_REGISTRY_PASSWORD' '$CI_REGISTRY' &&
+       cd /opt/see/frontend/e4l.frontend.docker &&
+       (docker-compose -f docker-compose.frontend.staging.yml pull || docker compose -f docker-compose.frontend.staging.yml pull) &&
+       (docker-compose -f docker-compose.frontend.staging.yml up -d || docker compose -f docker-compose.frontend.staging.yml up -d)"
+
+deploy_production:
+  stage: deploy-production
+  image: alpine:3.20
+  tags: [docker]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  needs:
+    - docker_build_frontend
+  environment:
+    name: production
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - printf "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+  script:
+    - ssh -i ~/.ssh/id_rsa -p 22 vagrant@192.168.56.11 "mkdir -p /opt/see/frontend"
+    - scp -i ~/.ssh/id_rsa -P 22 -r frontend/e4l.frontend.docker vagrant@192.168.56.11:/opt/see/frontend/
+    - >
+      ssh -i ~/.ssh/id_rsa -p 22 vagrant@192.168.56.11
+      "docker login -u '$CI_REGISTRY_USER' -p '$CI_REGISTRY_PASSWORD' '$CI_REGISTRY' &&
+       cd /opt/see/frontend/e4l.frontend.docker &&
+       (docker-compose -f docker-compose.frontend.prod.yml pull || docker compose -f docker-compose.frontend.prod.yml pull) &&
+       (docker-compose -f docker-compose.frontend.prod.yml up -d || docker compose -f docker-compose.frontend.prod.yml up -d)"
