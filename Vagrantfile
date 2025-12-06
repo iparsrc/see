@@ -75,4 +75,8 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     apt-get update
   SHELL
+
+  config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "playbook.yml"
+  end
 end
