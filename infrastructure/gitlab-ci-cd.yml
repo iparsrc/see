@@ -108,7 +108,7 @@ docker_build_frontend:
     - job: frontend_build
       artifacts: true
   script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build --pull -t "$CI_REGISTRY_IMAGE:latest" ./frontend/e4l.frontend.docker/web
     - |
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
@@ -138,7 +138,7 @@ docker_build_backend:
     - job: backend_build
       artifacts: true
   script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - cd backend
     # Ensure the expected jar name exists for the Dockerfile (adjust if needed)
     - |
@@ -167,7 +167,7 @@ deploy_staging:
     - scp -P 22 -r frontend/e4l.frontend.docker vagrant@192.168.56.10:/opt/see/frontend/
     - >
       ssh -p 22 vagrant@192.168.56.10
-      "docker login -u '$CI_REGISTRY_USER' -p '$CI_REGISTRY_PASSWORD' '$CI_REGISTRY' &&
+      "echo '$CI_JOB_TOKEN' | docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY' &&
        cd /opt/see/frontend/e4l.frontend.docker &&
        (docker-compose -f docker-compose.frontend.staging.yml pull || docker compose -f docker-compose.frontend.staging.yml pull) &&
        (docker-compose -f docker-compose.frontend.staging.yml up -d || docker compose -f docker-compose.frontend.staging.yml up -d)"
@@ -191,7 +191,7 @@ deploy_production:
     - scp -P 22 -r frontend/e4l.frontend.docker vagrant@192.168.56.11:/opt/see/frontend/
     - >
       ssh -p 22 vagrant@192.168.56.11
-      "docker login -u '$CI_REGISTRY_USER' -p '$CI_REGISTRY_PASSWORD' '$CI_REGISTRY' &&
+      "echo '$CI_JOB_TOKEN' | docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY' &&
        cd /opt/see/frontend/e4l.frontend.docker &&
        (docker-compose -f docker-compose.frontend.prod.yml pull || docker compose -f docker-compose.frontend.prod.yml pull) &&
        (docker-compose -f docker-compose.frontend.prod.yml up -d || docker compose -f docker-compose.frontend.prod.yml up -d)"
