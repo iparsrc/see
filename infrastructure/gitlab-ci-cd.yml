@@ -8,6 +8,8 @@ variables:
   # Required for Docker-in-Docker
   DOCKER_TLS_CERTDIR: ""
   GIT_STRATEGY: fetch
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
 
 stages:
   - backend-build
@@ -104,9 +106,9 @@ docker_build_frontend:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - frontend/**/*
-  # needs:
-  #   - job: frontend_build
-      # artifacts: true
+  needs:
+    - job: frontend_build
+      artifacts: true
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build --pull -t "$CI_REGISTRY_IMAGE:latest" ./frontend/e4l.frontend.docker/web
@@ -134,9 +136,9 @@ docker_build_backend:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - backend/**/*
-  # needs:
-  #   - job: backend_build
-  #     artifacts: true
+  needs:
+    - job: backend_build
+      artifacts: true
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - cd backend
