@@ -104,8 +104,8 @@ docker_build_frontend:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - frontend/**/*
-  needs:
-    - job: frontend_build
+  # needs:
+  #   - job: frontend_build
       artifacts: true
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
@@ -134,9 +134,9 @@ docker_build_backend:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - backend/**/*
-  needs:
-    - job: backend_build
-      artifacts: true
+  # needs:
+  #   - job: backend_build
+  #     artifacts: true
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - cd backend
@@ -154,8 +154,8 @@ deploy_staging:
   tags: [docker]
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
-  needs:
-    - docker_build_frontend
+  # needs:
+  #   - docker_build_frontend
   environment:
     name: staging
   before_script:
@@ -178,8 +178,8 @@ deploy_production:
   tags: [docker]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
-  needs:
-    - job: docker_build_frontend
+  # needs:
+  #   - job: docker_build_frontend
       optional: true
   environment:
     name: production
