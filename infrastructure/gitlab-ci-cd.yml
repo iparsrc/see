@@ -8,11 +8,6 @@ variables:
   # Required for Docker-in-Docker
   DOCKER_TLS_CERTDIR: ""
   GIT_STRATEGY: fetch
-  # Set these in GitLab CI/CD variables
-  # DEPLOY_USER: "vagrant"
-  # STAGING_HOST: "192.168.56.10"
-  # PRODUCTION_HOST: "192.168.56.11"
-  # SSH_PRIVATE_KEY: "<your private key>"
 
 stages:
   - backend-build
