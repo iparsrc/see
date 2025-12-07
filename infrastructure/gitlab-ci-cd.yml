@@ -20,7 +20,7 @@ stages:
 
 backend_build:
   stage: backend-build
-  image: gradle:8.3-jdk-20
+  image: gradle:8.3
   tags: [docker]
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
@@ -40,7 +40,7 @@ backend_build:
 
 backend_test:
   stage: backend-test
-  image: gradle:8.3-jdk-20
+  image: gradle:8.3
   tags: [docker]
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
