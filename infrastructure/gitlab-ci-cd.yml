@@ -106,7 +106,7 @@ docker_build_frontend:
         - frontend/**/*
   # needs:
   #   - job: frontend_build
-      artifacts: true
+      # artifacts: true
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build --pull -t "$CI_REGISTRY_IMAGE:latest" ./frontend/e4l.frontend.docker/web
@@ -180,7 +180,7 @@ deploy_production:
     - if: '$CI_COMMIT_BRANCH == "main"'
   # needs:
   #   - job: docker_build_frontend
-      optional: true
+      # optional: true
   environment:
     name: production
   before_script:
