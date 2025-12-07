@@ -12,65 +12,44 @@ Vagrant.configure("2") do |config|
   SHELL
 
   ## ===============================
-  ## DEV VM
+  ## Integration VM
   ## ===============================
-  config.vm.define "dev" do |dev|
-    dev.vm.hostname = "see-ubuntu"
+  config.vm.define "integration-server" do |integration-server|
+    integration-server.vm.hostname = "integration-server"
 
-    dev.vm.network "forwarded_port", guest: 80, host: 8080
-    dev.vm.network "private_network", ip: "192.168.56.9"
+    integration-server.vm.network "forwarded_port", guest: 80, host: 8080
+    integration-server.vm.network "private_network", ip: "192.168.56.9"
 
-    dev.vm.synced_folder "./data", "/vagrant_data"
+    integration-server.vm.synced_folder "./data-integration", "/vagrant_data"
 
-    dev.vm.provider "virtualbox" do |vb|
+    integration-server.vm.provider "virtualbox" do |vb|
       vb.memory = 3 * 1024
-      vb.cpus = 2
+      vb.cpus = 3
     end
 
-    dev.vm.provision "ansible" do |ansible|
-      ansible.playbook = "playbooks/playbook.yml"
-    end
-  end
-
-  ## ===============================
-  ## PROD VM
-  ## ===============================
-  config.vm.define "prod" do |prod|
-    prod.vm.hostname = "see-prod-ubuntu"
-
-    prod.vm.network "forwarded_port", guest: 80, host: 8082
-    prod.vm.network "private_network", ip: "192.168.56.11"
-
-    prod.vm.synced_folder "./data-prod", "/vagrant_data"
-
-    prod.vm.provider "virtualbox" do |vb|
-      vb.memory = 2 * 1024
-      vb.cpus = 2
-    end
-
-    prod.vm.provision "ansible" do |ansible|
-      ansible.playbook = "playbooks/prod.yml"
+    integration-server.vm.provision "ansible" do |ansible|
+      ansible.playbook = "playbooks/integration.yml"
     end
   end
 
   ## ===============================
-  ## STAGING VM
+  ## Deployment VM
   ## ===============================
-  config.vm.define "staging" do |staging|
-    staging.vm.hostname = "see-staging-ubuntu"
+  config.vm.define "deployment-server" do |deployment-server|
+    deployment-server.vm.hostname = "deployment-server"
 
-    staging.vm.network "forwarded_port", guest: 80, host: 8081
-    staging.vm.network "private_network", ip: "192.168.56.10"
+    deployment-server.vm.network "forwarded_port", guest: 80, host: 8081
+    deployment-server.vm.network "private_network", ip: "192.168.56.10"
 
-    staging.vm.synced_folder "./data-staging", "/vagrant_data"
+    deployment-server.vm.synced_folder "./data-deployment", "/vagrant_data"
 
-    staging.vm.provider "virtualbox" do |vb|
-      vb.memory = 2 * 1024
-      vb.cpus = 2
+    deployment-server.vm.provider "virtualbox" do |vb|
+      vb.memory = 3 * 1024
+      vb.cpus = 3
     end
 
-    staging.vm.provision "ansible" do |ansible|
-      ansible.playbook = "playbooks/staging.yml"
+    deployment-server.vm.provision "ansible" do |ansible|
+      ansible.playbook = "playbooks/deployment.yml"
     end
   end
 end

@@ -1,0 +1,77 @@
+---
+- name: Install Docker, GitLab, and GitLab Runner on Ubuntu
+  hosts: all
+  become: yes
+
+  vars:
+    gitlab_external_url: "http://192.168.56.9"
+
+  tasks:
+    ###########################################################################
+    # Install Dependencies
+    ###########################################################################
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+
+    ###########################################################################
+    # Install Docker
+    ###########################################################################
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
+        state: present
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker.io
+        state: present
+        update_cache: yes
+
+    - name: Enable/start Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+
+    ###########################################################################
+    # Install GitLab CE
+    ###########################################################################
+    - name: Add GitLab repository installer script
+      get_url:
+        url: https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
+        dest: /tmp/gitlab_install.sh
+        mode: '0755'
+
+    - name: Run GitLab repo installer
+      command: bash /tmp/gitlab_install.sh
+
+    - name: Install GitLab CE
+      apt:
+        name: gitlab-ce
+        state: latest
+
+    - name: Configure GitLab external URL
+      lineinfile:
+        path: /etc/gitlab/gitlab.rb
+        regexp: "^external_url"
+        line: "external_url '{{ gitlab_external_url }}'"
+
+    - name: Reconfigure GitLab (runs chef automation)
+      command: gitlab-ctl reconfigure
