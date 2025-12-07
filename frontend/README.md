@@ -76,3 +76,5 @@ The project is still using local state in different situations. For example wher
 Axios is a Promise based Javascript library which is used to make http requests. It is comparable to Fetch in features but better manages JSON data.
 
 It is used in several actions/reducers.
+
+test
