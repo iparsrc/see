@@ -29,8 +29,8 @@ Vagrant.configure("2") do |config|
 
     integration.vm.provision "shell", inline: <<-SHELL
       mkdir -p ~vagrant/.ssh
-      cp /vagrant/infrastructure/keys/key ~vagrant/.ssh/id_ed25519
-      cp /vagrant/infrastructure/keys/key.pub ~vagrant/.ssh/id_ed25519.pub
+      cp /vagrant_data/keys/key ~vagrant/.ssh/id_ed25519
+      cp /vagrant_data/keys/key.pub ~vagrant/.ssh/id_ed25519.pub
       chown -R vagrant:vagrant ~vagrant/.ssh
       chmod 700 ~vagrant/.ssh
       chmod 600 ~vagrant/.ssh/id_ed25519
@@ -61,7 +61,7 @@ Vagrant.configure("2") do |config|
     deployment.vm.provision "shell", inline: <<-SHELL
       mkdir -p ~vagrant/.ssh
       touch ~vagrant/.ssh/authorized_keys
-      cat /vagrant/infrastructure/keys/key.pub >> ~vagrant/.ssh/authorized_keys
+      cat /vagrant_data/keys/key.pub >> ~vagrant/.ssh/authorized_keys
       chown -R vagrant:vagrant ~vagrant/.ssh
       chmod 700 ~vagrant/.ssh
       chmod 600 ~vagrant/.ssh/authorized_keys
