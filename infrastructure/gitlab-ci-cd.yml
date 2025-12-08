@@ -39,4 +39,4 @@ deploy_staging:
       - sudo docker network inspect network-prod >/dev/null 2>&1 || sudo docker network create network-prod
       - sudo docker compose -f docker-compose.prod.yml up -d --build
     only:
-      - prod
+      - main
