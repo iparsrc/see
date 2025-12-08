@@ -50,6 +50,7 @@ services:
       args:
         # Bakes the API URL into the build (dotenv-webpack)
         API_URL: http://127.0.0.1:3001/e4lapi
+        PUBLIC_PATH: /
     container_name: e4l-frontend
     depends_on:
       - backend
