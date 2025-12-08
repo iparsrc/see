@@ -1,0 +1,69 @@
+network:
+  network-staging:
+    external: true
+
+services:
+  db:
+    image: mariadb:10.4.7
+    container_name: e4l-db-staging
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=e4l
+      - MYSQL_USER=e4l
+      - MYSQL_PASSWORD=e4lpass
+      - TZ=Europe/Luxembourg
+    volumes:
+      - db_data_staging:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - network-staging
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: e4l-backend-staging
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DEV_SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/e4l?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - DEV_SPRING_DATASOURCE_USERNAME=e4l
+      - DEV_SPRING_DATASOURCE_PASSWORD=e4lpass
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.MariaDB103Dialect
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - JWT_SECRET=devsecret
+      - SIGNATURE_KEY=devsign
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=adminpass
+      - DEV_RESOURCES_STATIC_URL=http://localhost:3001/e4lapi/static/
+    ports:
+      - "3001:8080"
+    networks:
+      - network-staging
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        # Bakes the API URL into the build (dotenv-webpack)
+        API_URL: http://127.0.0.1:3001/e4lapi
+        PUBLIC_PATH: /
+    container_name: e4l-frontend-staging
+    depends_on:
+      - backend
+    ports:
+      - "3002:80"
+    networks:
+      - network-staging
+
+volumes:
+  db_data_staging:

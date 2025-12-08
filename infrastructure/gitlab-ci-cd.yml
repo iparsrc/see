@@ -1,12 +1,13 @@
-# create a pipeline only for dev and main branches
+# create a pipeline only for staging and main branches
 workflow:
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "staging"'
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
 
 stages:
   - deploy-staging
+  - deploy-prod
 
 deploy_staging:
   stage: deploy-staging
@@ -15,9 +16,27 @@ deploy_staging:
     - sudo mkdir -p /srv/app/staging
     - cd /srv/app/staging
     - sudo rm -rf see
-    - sudo git clone http://192.168.56.9/student/see.git
+    - sudo git clone --branch staging http://192.168.56.9/student/see.git
     - cd see/infrastructure
-    - sudo docker compose -f docker-compose.yml down
+    - sudo docker compose -f docker-compose.staging.yml down
     - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
-    - sudo docker compose -f docker-compose.yml up -d --build
-   
+    - sudo docker network inspect network-staging >/dev/null 2>&1 || sudo docker network create network-staging
+    - sudo docker compose -f docker-compose.staging.yml up -d --build
+  only:
+    - staging
+
+  deploy_prod:
+    stage: deploy-prod
+    tags: [shell]
+    script:
+      - sudo mkdir -p /srv/app/prod
+      - cd /srv/app/prod
+      - sudo rm -rf see
+      - sudo git clone --branch main http://192.168.56.9/student/see.git
+      - cd see/infrastructure
+      - sudo docker compose -f docker-compose.prod.yml down
+      - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
+      - sudo docker network inspect network-prod >/dev/null 2>&1 || sudo docker network create network-prod
+      - sudo docker compose -f docker-compose.prod.yml up -d --build
+    only:
+      - prod

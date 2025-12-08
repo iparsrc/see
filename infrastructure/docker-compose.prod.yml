@@ -1,9 +1,11 @@
-version: "3.9"
+network:
+  network-prod:
+    external: true
 
 services:
   db:
     image: mariadb:10.4.7
-    container_name: e4l-db
+    container_name: e4l-db-prod
     environment:
       - MYSQL_ROOT_PASSWORD=rootpass
       - MYSQL_DATABASE=e4l
@@ -11,26 +13,28 @@ services:
       - MYSQL_PASSWORD=e4lpass
       - TZ=Europe/Luxembourg
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data_prod:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "9306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 10s
+    networks:
+      - network-prod
 
   backend:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    container_name: e4l-backend
+    container_name: e4l-backend-prod
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - DEV_SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/e4l?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - DEV_SPRING_DATASOURCE_URL=jdbc:mysql://db:9306/e4l?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - DEV_SPRING_DATASOURCE_USERNAME=e4l
       - DEV_SPRING_DATASOURCE_PASSWORD=e4lpass
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.MariaDB103Dialect
@@ -39,9 +43,11 @@ services:
       - SIGNATURE_KEY=devsign
       - ADMIN_EMAIL=admin@example.com
       - ADMIN_PASSWORD=adminpass
-      - DEV_RESOURCES_STATIC_URL=http://localhost:3001/e4lapi/static/
+      - DEV_RESOURCES_STATIC_URL=http://localhost:9001/e4lapi/static/
     ports:
-      - "3001:8080"
+      - "9001:8080"
+    networks:
+      - network-prod
 
   frontend:
     build:
@@ -49,13 +55,15 @@ services:
       dockerfile: Dockerfile
       args:
         # Bakes the API URL into the build (dotenv-webpack)
-        API_URL: http://127.0.0.1:3001/e4lapi
+        API_URL: http://127.0.0.1:9001/e4lapi
         PUBLIC_PATH: /
-    container_name: e4l-frontend
+    container_name: e4l-frontend-prod
     depends_on:
       - backend
     ports:
-      - "3002:80"
+      - "9002:80"
+    networks:
+      - network-prod
 
 volumes:
-  db_data:
+  db_data_prod:
