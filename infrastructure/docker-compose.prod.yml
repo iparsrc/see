@@ -1,4 +1,4 @@
-network:
+networks:
   network-prod:
     external: true
 
