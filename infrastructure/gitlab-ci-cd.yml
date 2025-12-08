@@ -17,4 +17,5 @@ deploy_staging:
     - cd /srv/app/staging
     - sudo rm -rf see
     - sudo git clone http://192.168.56.9/student/see.git
-    - ls -l
+    - cd see/infrastructure
+    - sudo docker compose -f docker-compose.yml up -d --build
