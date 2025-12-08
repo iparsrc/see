@@ -25,18 +25,18 @@ deploy_staging:
   only:
     - staging
 
-  deploy_prod:
-    stage: deploy-prod
-    tags: [shell]
-    script:
-      - sudo mkdir -p /srv/app/prod
-      - cd /srv/app/prod
-      - sudo rm -rf see
-      - sudo git clone --branch main http://192.168.56.9/student/see.git
-      - cd see/infrastructure
-      - sudo docker compose -f docker-compose.prod.yml down
-      - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
-      - sudo docker network inspect network-prod >/dev/null 2>&1 || sudo docker network create network-prod
-      - sudo docker compose -f docker-compose.prod.yml up -d --build
-    only:
-      - main
+deploy_prod:
+  stage: deploy-prod
+  tags: [shell]
+  script:
+    - sudo mkdir -p /srv/app/prod
+    - cd /srv/app/prod
+    - sudo rm -rf see
+    - sudo git clone --branch main http://192.168.56.9/student/see.git
+    - cd see/infrastructure
+    - sudo docker compose -f docker-compose.prod.yml down
+    - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
+    - sudo docker network inspect network-prod >/dev/null 2>&1 || sudo docker network create network-prod
+    - sudo docker compose -f docker-compose.prod.yml up -d --build
+  only:
+    - main
