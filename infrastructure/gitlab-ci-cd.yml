@@ -6,7 +6,7 @@ workflow:
     - when: never
 
 stages:
-  deploy-staging
+  - deploy-staging
 
 deploy_staging:
   stage: deploy-staging
