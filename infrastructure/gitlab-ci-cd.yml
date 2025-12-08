@@ -6,8 +6,62 @@ workflow:
     - when: never
 
 stages:
+  - backend-test
+  - backend-build
+  - frontend-test
+  - frontend-build
   - deploy-staging
   - deploy-prod
+
+backend_test:
+  stage: backend-test
+  image: gradle:8.3
+  tags: [docker]
+  rules:
+    - changes:
+        - backend/**/*
+  script:
+    - cd backend && gradle clean check
+
+backend_build:
+  stage: backend-build
+  image: gradle:8.3
+  tags: [docker]
+  rules:
+    - changes:
+        - backend/**/*
+  script:
+    - cd backend && gradle --build-cache clean build bootJar
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - backend/build/libs/*.jar
+
+frontend_test:
+  stage: frontend-test
+  image: node:22
+  tags: [docker]
+  rules:
+    - changes:
+        - frontend/**/*
+  script:
+    - cd frontend && npm ci && npm run test --if-present
+
+frontend_build:
+  stage: frontend-build
+  image: node:22
+  tags: [docker]
+  rules:
+    - changes:
+        - frontend/**/*
+  script:
+    - cd frontend && npm ci && npm run build
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - frontend/e4l.frontend.docker/web/dist/**
 
 deploy_staging:
   stage: deploy-staging
