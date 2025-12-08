@@ -59,7 +59,7 @@ services:
         PUBLIC_PATH: /
     container_name: e4l-frontend-prod
     depends_on:
-      - backend
+      - backend-prod
     ports:
       - "9002:80"
     networks:

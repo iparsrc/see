@@ -59,7 +59,7 @@ services:
         PUBLIC_PATH: /
     container_name: e4l-frontend-staging
     depends_on:
-      - backend
+      - backend-staging
     ports:
       - "3002:80"
     networks:
