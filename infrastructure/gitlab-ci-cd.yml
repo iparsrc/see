@@ -12,5 +12,8 @@ deploy_staging:
   stage: deploy-staging
   tags: [shell]
   script:
-    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTERY"
-    - echo "Hello world"
+    - mkdir -p /srv/app/staging
+    - cd /srv/app/staging
+    - rm -rf see
+    - git clone http://192.168.56.9/student/see.git
+    - ls -l
