@@ -73,7 +73,6 @@
       shell: "usermod -aG docker {{ item }}"
       with_items:
         - vagrant
-        - gitlab-runner
 
     - name: Enable/start Docker
       service:
