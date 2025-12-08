@@ -26,40 +26,54 @@
     ###########################################################################
     # Install Docker
     ###########################################################################
-    - name: Create Docker APT keyring directory
-      file:
-        path: /etc/apt/keyrings
-        state: directory
-        mode: '0755'
-
-    - name: Download Docker GPG key (ASCII armored)
-      get_url:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        dest: /etc/apt/keyrings/docker.asc
-        mode: '0644'
-
-    - name: Convert Docker GPG key to keyring
-      command: gpg --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc
-      args:
-        creates: /etc/apt/keyrings/docker.gpg
-
-    - name: Add Docker APT repository (official)
-      apt_repository:
-        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
-        state: present
-        filename: docker
-        update_cache: yes
-
-    - name: Install Docker Engine and plugins (upstream)
+    - name: Update repositories cache. 
       apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
-        state: present
         update_cache: yes
+
+    - name: Safe system upgrade via aptitude.
+      apt: 
+        upgrade: safe
+
+    - name: Install packages required by Docker.
+      apt:
+        name: "{{ packages }}"
+      vars:
+        packages:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update repositories cache. 
+      apt:
+        update_cache: yes    
+      
+    - name: Install Docker packages. 
+      apt:
+        name: "{{ dockerpackages }}"
+      vars:
+        dockerpackages:
+        - docker-ce 
+        - docker-ce-cli
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-compose-plugin
+        
+    - name: Add users to docker group. 
+      shell: "usermod -aG docker {{ item }}"
+      with_items:
+        - vagrant
+        - gitlab-runner
 
     - name: Enable/start Docker
       service:
