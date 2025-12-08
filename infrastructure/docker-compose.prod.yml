@@ -31,7 +31,7 @@ services:
       dockerfile: Dockerfile
     container_name: e4l-backend-prod
     depends_on:
-      db:
+      db-prod:
         condition: service_healthy
     environment:
       - DEV_SPRING_DATASOURCE_URL=jdbc:mysql://db-prod:9306/e4l?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC

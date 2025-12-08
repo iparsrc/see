@@ -31,7 +31,7 @@ services:
       dockerfile: Dockerfile
     container_name: e4l-backend-staging
     depends_on:
-      db:
+      db-staging:
         condition: service_healthy
     environment:
       - DEV_SPRING_DATASOURCE_URL=jdbc:mysql://db-staging:3306/e4l?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
