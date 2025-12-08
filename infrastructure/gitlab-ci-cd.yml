@@ -1,101 +1,99 @@
+# create a pipeline only for dev and main branches
 workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH == "dev"'
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
 
+
+# variables available to all jobs
 variables:
-  # Required for Docker-in-Docker
+  # disable tls for docker-in-docker
   DOCKER_TLS_CERTDIR: ""
+
+  # reuse the repository by fetching instead of fresh clone
   GIT_STRATEGY: fetch
+
+  # host for docker-in-docker over plain tcp
   DOCKER_HOST: tcp://docker:2375
+
+  # use overlay2 as driver for docker-in-docker
   DOCKER_DRIVER: overlay2
-  # Canonical image repo roots
-  DOCKER_FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend"
+
+  # backend image repository path
   DOCKER_BACKEND_IMAGE: "$CI_REGISTRY_IMAGE/backend"
-  # Default fallback; overridden per-branch in jobs when tagging
+
+  # frontend image repository path
+  DOCKER_FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend"
+
+  # default image tag from branch/tag name
   IMAGE_TAG: "$CI_COMMIT_REF_SLUG"
 
+
+# jobs to run in order
 stages:
-  - backend-build
   - backend-test
-  - frontend-build
+  - backend-build
   - frontend-test
+  - frontend-build
   - docker-build
   - deploy-staging
   - deploy-production
 
-backend_build:
-  stage: backend-build
-  image: gradle:8.3
-  tags: [docker]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - backend/**/*
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - backend/**/*
-  script:
-    - cd backend
-    - gradle --build-cache clean build bootJar
-  artifacts:
-    when: on_success
-    expire_in: 1 week
-    paths:
-      - backend/build/libs/*.jar
 
 backend_test:
   stage: backend-test
   image: gradle:8.3
   tags: [docker]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - backend/**/*
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
+    - changes:
         - backend/**/*
   script:
-    - cd backend
-    - gradle clean check
+    - cd backend && gradle clean check
 
-frontend_build:
-  stage: frontend-build
-  image: node:22
+
+backend_build:
+  stage: backend-build
+  image: gradle:8.3
   tags: [docker]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - frontend/**/*
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - frontend/**/*
+    - changes:
+        - backend/**/*
   script:
-    - cd frontend
-    - npm ci
-    - npm run build
+    - cd backend && gradle --build-cache clean build bootJar
   artifacts:
     when: on_success
     expire_in: 1 week
     paths:
-      - frontend/e4l.frontend.docker/web/dist/**
+      - backend/build/libs/*.jar
+
 
 frontend_test:
   stage: frontend-test
   image: node:22
   tags: [docker]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - frontend/**/*
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
+    - changes:
         - frontend/**/*
   script:
-    - cd frontend
-    - npm ci
-    - npm run test --if-present
+    - cd frontend && npm ci && npm run test --if-present
+
+
+frontend_build:
+  stage: frontend-build
+  image: node:22
+  tags: [docker]
+  rules:
+    - changes:
+        - frontend/**/*
+  script:
+    - cd frontend && npm ci && npm run build
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - frontend/e4l.frontend.docker/web/dist/**
+
 
 docker_build_frontend:
   stage: docker-build
@@ -142,7 +140,7 @@ docker_build_frontend:
         docker push "$DOCKER_FRONTEND_IMAGE:latest"
       fi
 
-# Optional: backend image build (pushed with branch tag)
+
 docker_build_backend:
   stage: docker-build
   image: docker:27
@@ -193,6 +191,7 @@ docker_build_backend:
         docker push "$DOCKER_BACKEND_IMAGE:latest"
       fi
 
+
 deploy_staging:
   stage: deploy-staging
   image: alpine:3.20
@@ -216,6 +215,7 @@ deploy_staging:
        cd /opt/see/frontend/e4l.frontend.docker &&
        (docker-compose -f docker-compose.frontend.staging.yml pull || docker compose -f docker-compose.frontend.staging.yml pull) &&
        (docker-compose -f docker-compose.frontend.staging.yml up -d || docker compose -f docker-compose.frontend.staging.yml up -d)"
+
 
 deploy_production:
   stage: deploy-production
