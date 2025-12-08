@@ -1,6 +1,7 @@
 # create a pipeline only for staging and main branches
 workflow:
   rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
     - if: '$CI_COMMIT_BRANCH == "staging"'
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
@@ -10,6 +11,7 @@ stages:
   - backend-build
   - frontend-test
   - frontend-build
+  - deploy-dev
   - deploy-staging
   - deploy-prod
 
@@ -62,6 +64,22 @@ frontend_build:
     expire_in: 1 week
     paths:
       - frontend/e4l.frontend.docker/web/dist/**
+
+deploy_dev:
+  stage: deploy-dev
+  tags: [shell]
+  script:
+    - sudo mkdir -p /srv/app/dev
+    - cd /srv/app/dev
+    - sudo rm -rf see
+    - sudo git clone --branch dev http://192.168.56.9/student/see.git
+    - cd see/infrastructure
+    - sudo docker compose -f docker-compose.dev.yml down
+    - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
+    - sudo docker network inspect network-dev >/dev/null 2>&1 || sudo docker network create network-dev
+    - sudo docker compose -f docker-compose.dev.yml up -d --build
+  only:
+    - dev
 
 deploy_staging:
   stage: deploy-staging

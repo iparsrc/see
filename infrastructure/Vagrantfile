@@ -18,6 +18,8 @@ Vagrant.configure("2") do |config|
     integration.vm.hostname = "integration-server"
 
     integration.vm.network "forwarded_port", guest: 80, host: 8080
+    integration.vm.network "forwarded_port", guest: 7001, host: 7001 # dev backend
+    integration.vm.network "forwarded_port", guest: 7002, host: 7002 # dev frontend
     integration.vm.network "forwarded_port", guest: 3001, host: 3001 # staging backend
     integration.vm.network "forwarded_port", guest: 3002, host: 3002 # staging frontend
     integration.vm.network "forwarded_port", guest: 9001, host: 9001 # prod backend
