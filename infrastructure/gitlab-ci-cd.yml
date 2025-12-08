@@ -13,7 +13,6 @@ deploy_staging:
   tags: [shell]
   script:
     - whoami
-    - su - vagrant
     - mkdir -p /srv/app/staging
     - cd /srv/app/staging
     - rm -rf see
