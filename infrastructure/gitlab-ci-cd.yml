@@ -12,8 +12,8 @@ deploy_staging:
   stage: deploy-staging
   tags: [shell]
   script:
-    - mkdir -p /srv/app/staging
-    - cd /srv/app/staging
-    - rm -rf see
-    - git clone http://192.168.56.9/student/see.git
-    - ls -l
+    - sudo mkdir -p /srv/app/staging
+    - sudo cd /srv/app/staging
+    - sudo rm -rf see
+    - sudo git clone http://192.168.56.9/student/see.git
+    - sudo ls -l
