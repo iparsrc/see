@@ -95,52 +95,6 @@ frontend_build:
       - frontend/e4l.frontend.docker/web/dist/**
 
 
-docker_build_frontend:
-  stage: docker-build
-  image: docker:27
-  services:
-    - name: docker:27-dind
-      alias: docker
-  tags: [docker]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - frontend/**/*
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - frontend/**/*
-  needs:
-    - job: frontend_build
-      artifacts: true
-    - job: frontend_test
-  script:
-    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    # Derive environment tag
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        IMAGE_TAG="production"
-      elif [ "$CI_COMMIT_BRANCH" = "dev" ]; then
-        IMAGE_TAG="staging"
-      else
-        IMAGE_TAG="$CI_COMMIT_REF_SLUG"
-      fi
-      echo "Using frontend IMAGE_TAG=$IMAGE_TAG"
-    # Build from the actual frontend Dockerfile context
-    - docker build --pull -t "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG" -t "$DOCKER_FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA" ./frontend
-    # Also tag 'latest' on main for convenience
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        docker tag "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG" "$DOCKER_FRONTEND_IMAGE:latest"
-      fi
-    # Push all tags
-    - docker push "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG"
-    - docker push "$DOCKER_FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA"
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        docker push "$DOCKER_FRONTEND_IMAGE:latest"
-      fi
-
-
 docker_build_backend:
   stage: docker-build
   image: docker:27
@@ -149,11 +103,7 @@ docker_build_backend:
       alias: docker
   tags: [docker]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "dev"'
-      changes:
-        - backend/**/*
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
+    - changes:
         - backend/**/*
   needs:
     - job: backend_build
@@ -189,6 +139,48 @@ docker_build_backend:
     - |
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
         docker push "$DOCKER_BACKEND_IMAGE:latest"
+      fi
+
+
+docker_build_frontend:
+  stage: docker-build
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      alias: docker
+  tags: [docker]
+  rules:
+    - changes:
+        - frontend/**/*
+  needs:
+    - job: frontend_build
+      artifacts: true
+    - job: frontend_test
+  script:
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    # Derive environment tag
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        IMAGE_TAG="production"
+      elif [ "$CI_COMMIT_BRANCH" = "dev" ]; then
+        IMAGE_TAG="staging"
+      else
+        IMAGE_TAG="$CI_COMMIT_REF_SLUG"
+      fi
+      echo "Using frontend IMAGE_TAG=$IMAGE_TAG"
+    # Build from the actual frontend Dockerfile context
+    - docker build --pull -t "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG" -t "$DOCKER_FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA" ./frontend
+    # Also tag 'latest' on main for convenience
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG" "$DOCKER_FRONTEND_IMAGE:latest"
+      fi
+    # Push all tags
+    - docker push "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG"
+    - docker push "$DOCKER_FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker push "$DOCKER_FRONTEND_IMAGE:latest"
       fi
 
 
