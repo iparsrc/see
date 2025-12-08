@@ -10,6 +10,11 @@ variables:
   GIT_STRATEGY: fetch
   DOCKER_HOST: tcp://docker:2375
   DOCKER_DRIVER: overlay2
+  # Canonical image repo roots
+  DOCKER_FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend"
+  DOCKER_BACKEND_IMAGE: "$CI_REGISTRY_IMAGE/backend"
+  # Default fallback; overridden per-branch in jobs when tagging
+  IMAGE_TAG: "$CI_COMMIT_REF_SLUG"
 
 stages:
   - backend-build
@@ -109,16 +114,32 @@ docker_build_frontend:
   needs:
     - job: frontend_build
       artifacts: true
+    - job: frontend_test
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker build --pull -t "$CI_REGISTRY_IMAGE:latest" ./frontend/e4l.frontend.docker/web
+    # Derive environment tag
     - |
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        docker push "$CI_REGISTRY_IMAGE:latest"
-        docker tag "$CI_REGISTRY_IMAGE:latest" "$CI_REGISTRY_IMAGE:release"
-        docker push "$CI_REGISTRY_IMAGE:release"
+        IMAGE_TAG="production"
+      elif [ "$CI_COMMIT_BRANCH" = "dev" ]; then
+        IMAGE_TAG="staging"
       else
-        docker push "$CI_REGISTRY_IMAGE:latest"
+        IMAGE_TAG="$CI_COMMIT_REF_SLUG"
+      fi
+      echo "Using frontend IMAGE_TAG=$IMAGE_TAG"
+    # Build from the actual frontend Dockerfile context
+    - docker build --pull -t "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG" -t "$DOCKER_FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA" ./frontend
+    # Also tag 'latest' on main for convenience
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG" "$DOCKER_FRONTEND_IMAGE:latest"
+      fi
+    # Push all tags
+    - docker push "$DOCKER_FRONTEND_IMAGE:$IMAGE_TAG"
+    - docker push "$DOCKER_FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker push "$DOCKER_FRONTEND_IMAGE:latest"
       fi
 
 # Optional: backend image build (pushed with branch tag)
@@ -139,6 +160,7 @@ docker_build_backend:
   needs:
     - job: backend_build
       artifacts: true
+    - job: backend_test
   script:
     - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - cd backend
@@ -147,8 +169,29 @@ docker_build_backend:
       JAR_SRC="$(ls build/libs/*.jar | head -n1)"
       echo "Using jar: $JAR_SRC"
       cp "$JAR_SRC" build/libs/e4l-server.jar
-    - docker build --pull -t "$CI_REGISTRY_IMAGE/backend:${CI_COMMIT_BRANCH}" .
-    - docker push "$CI_REGISTRY_IMAGE/backend:${CI_COMMIT_BRANCH}"
+    # Derive environment tag
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        IMAGE_TAG="production"
+      elif [ "$CI_COMMIT_BRANCH" = "dev" ]; then
+        IMAGE_TAG="staging"
+      else
+        IMAGE_TAG="$CI_COMMIT_REF_SLUG"
+      fi
+      echo "Using backend IMAGE_TAG=$IMAGE_TAG"
+    - docker build --pull -t "$DOCKER_BACKEND_IMAGE:$IMAGE_TAG" -t "$DOCKER_BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA" .
+    # Also tag 'latest' on main for convenience
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "$DOCKER_BACKEND_IMAGE:$IMAGE_TAG" "$DOCKER_BACKEND_IMAGE:latest"
+      fi
+    # Push all tags
+    - docker push "$DOCKER_BACKEND_IMAGE:$IMAGE_TAG"
+    - docker push "$DOCKER_BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker push "$DOCKER_BACKEND_IMAGE:latest"
+      fi
 
 deploy_staging:
   stage: deploy-staging
