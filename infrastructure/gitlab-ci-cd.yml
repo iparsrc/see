@@ -10,5 +10,6 @@ stages:
 
 deploy_staging:
   stage: deploy-staging
+  tags: [shell]
   script:
     - echo "Hello world"
