@@ -12,6 +12,7 @@ deploy_staging:
   stage: deploy-staging
   tags: [shell]
   script:
+    - whoami
     - sudo mkdir -p /srv/app/staging
     - sudo cd /srv/app/staging
     - sudo rm -rf see
