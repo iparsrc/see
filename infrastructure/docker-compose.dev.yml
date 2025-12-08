@@ -43,9 +43,9 @@ services:
       - SIGNATURE_KEY=devsign
       - ADMIN_EMAIL=admin@example.com
       - ADMIN_PASSWORD=adminpass
-      - DEV_RESOURCES_STATIC_URL=http://localhost:7001/e4lapi/static/
+      - DEV_RESOURCES_STATIC_URL=http://localhost:8001/e4lapi/static/
     ports:
-      - "7001:8080"
+      - "8001:8080"
     networks:
       - network-dev
 
@@ -55,13 +55,13 @@ services:
       dockerfile: Dockerfile
       args:
         # Bakes the API URL into the build (dotenv-webpack)
-        API_URL: http://127.0.0.1:7001/e4lapi
+        API_URL: http://127.0.0.1:8001/e4lapi
         PUBLIC_PATH: /
     container_name: e4l-frontend-dev
     depends_on:
       - backend-dev
     ports:
-      - "7002:80"
+      - "8002:80"
     networks:
       - network-dev
 
