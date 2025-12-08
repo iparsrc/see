@@ -16,5 +16,5 @@ deploy_staging:
     - sudo mkdir -p /srv/app/staging
     - cd /srv/app/staging
     - sudo rm -rf see
-    - git clone http://192.168.56.9/student/see.git
+    - sudo git clone http://192.168.56.9/student/see.git
     - ls -l
