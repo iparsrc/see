@@ -5,6 +5,7 @@
 
   vars:
     gitlab_external_url: "http://192.168.56.9"
+    gitlab_student_repo_url: "http://student:xxcc0xxcc@192.168.56.9"
 
   tasks:
     ###########################################################################
@@ -19,6 +20,7 @@
           - gnupg
           - lsb-release
           - software-properties-common
+          - git
         state: present
         update_cache: yes
 
@@ -82,7 +84,7 @@
 
 
     ###########################################################################
-    # Install GitLab CE
+    # Install GitLab & Setup User and Repository
     ###########################################################################
     - name: Add GitLab repository installer script
       get_url:
@@ -106,3 +108,64 @@
 
     - name: Reconfigure GitLab (runs chef automation)
       command: gitlab-ctl reconfigure
+
+    - name: Create GitLab user 'student'
+      command: >
+        gitlab-rails runner "u = User.find_or_initialize_by(username: 'student'); u.name = 'student'; u.email = 'student@uni.lu'; u.password = 'xxcc0xxcc'; u.password_confirmation = 'xxcc0xxcc'; u.skip_confirmation!; u.save!"
+
+    - name: Configure Git global username
+      git_config:
+        name: user.name
+        scope: global
+        value: "student"
+
+    - name: Configure Git global email
+      git_config:
+        name: user.email
+        scope: global
+        value: "student@uni.lu"
+
+    - name: Clone 'see' repository from GitHub
+      git:
+        repo: "https://github.com/iparsrc/see.git"
+        dest: /srv/see
+        version: main
+        force: yes
+
+    - name: Ensure GitLab project 'see' exists for user 'student'
+      command: >
+        gitlab-rails runner "u = User.find_by(username: 'student'); p = Project.find_by_full_path('student/see'); unless p; Projects::CreateService.new(u, name: 'see', path: 'see').execute; end"
+
+    - name: Point local 'see' repository to local GitLab remote
+      command: git remote set-url origin "{{ gitlab_student_repo_url }}/student/see.git"
+      args:
+        chdir: /srv/see
+
+    - name: Push 'see' repository to local GitLab
+      command: git push -u origin main
+      args:
+        chdir: /srv/see
+
+
+    ###########################################################################
+    # Install GitLab Runner
+    ###########################################################################
+    - name: Add GitLab Runner repository installer script
+      get_url:
+        url: https://packages.gitlab.com/install/repositories/gitlab/gitlab-runner/script.deb.sh
+        dest: /tmp/gitlab_runner_install.sh
+        mode: '0755'
+
+    - name: Run GitLab Runner repo installer
+      command: bash /tmp/gitlab_runner_install.sh
+
+    - name: Install GitLab Runner
+      apt:
+        name: gitlab-runner
+        state: latest
+
+    - name: Ensure GitLab Runner service is enabled and running
+      service:
+        name: gitlab-runner
+        state: started
+        enabled: yes
