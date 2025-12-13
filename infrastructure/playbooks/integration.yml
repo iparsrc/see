@@ -111,7 +111,7 @@
 
     - name: Create GitLab user 'student'
       command: >
-        gitlab-rails runner "u = User.find_or_initialize_by(username: 'student'); u.name = 'student'; u.email = 'student@uni.lu'; u.password = 'xxcc0xxcc'; u.password_confirmation = 'xxcc0xxcc'; u.skip_confirmation!; u.save!"
+        gitlab-rails runner "u = User.find_by(username: 'student'); unless u; admin = User.where(admin: true).first || User.first; params = { name: 'student', username: 'student', email: 'student@uni.lu', password: 'xxcc0xxcc', password_confirmation: 'xxcc0xxcc' }; Users::CreateService.new(admin, params).execute; end"
 
     - name: Configure Git global username
       git_config:
