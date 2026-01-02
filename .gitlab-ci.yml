@@ -1,0 +1,134 @@
+# create a pipeline only for dev, staging, and prod branches
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+    - if: '$CI_COMMIT_BRANCH == "prod"'
+    - when: never
+
+stages:
+  - dev-backend-test
+  - dev-backend-build
+  - dev-frontend-test
+  - dev-frontend-build
+  - dev-deploy
+  - staging-deploy
+  - staging-integration-tests
+  - staging-acceptance-tests
+  - prod-deploy
+
+dev_backend_test:
+  stage: dev-backend-test
+  image: gradle:8.3
+  tags: [docker]
+  script:
+    - cd backend && gradle clean test --tests "*UnitTest"
+  only:
+    - dev
+
+dev_backend_build:
+  stage: dev-backend-build
+  image: gradle:8.3
+  tags: [docker]
+  script:
+    - cd backend && gradle --build-cache clean build bootJar -x test
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - backend/build/libs/*.jar
+  only:
+    - dev
+
+dev_frontend_test:
+  stage: dev-frontend-test
+  image: node:22
+  tags: [docker]
+  script:
+    - cd frontend && npm ci --legacy-peer-deps && npm run test --if-present
+  only:
+    - dev
+
+dev_frontend_build:
+  stage: dev-frontend-build
+  image: node:22
+  tags: [docker]
+  script:
+    - cd frontend && npm ci --legacy-peer-deps && npm run build
+  artifacts:
+    when: on_success
+    expire_in: 1 week
+    paths:
+      - frontend/e4l.frontend.docker/web/dist/**
+  only:
+    - dev
+
+dev_deploy:
+  stage: dev-deploy
+  tags: [shell]
+  script:
+    - sudo mkdir -p /srv/app/dev
+    - cd /srv/app/dev
+    - sudo rm -rf see
+    - sudo git clone --branch dev http://192.168.56.9/student/see.git
+    - cd see/infrastructure
+    - sudo docker compose -f docker-compose.dev.yml down
+    - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
+    - sudo docker network inspect network-dev >/dev/null 2>&1 || sudo docker network create network-dev
+    - sudo docker compose -f docker-compose.dev.yml up -d --build
+  only:
+    - dev
+
+staging_deploy:
+  stage: staging-deploy
+  tags: [shell]
+  script:
+    - sudo mkdir -p /srv/app/staging
+    - cd /srv/app/staging
+    - sudo rm -rf see
+    - sudo git clone --branch staging http://192.168.56.9/student/see.git
+    - cd see/infrastructure
+    - sudo docker compose -f docker-compose.staging.yml down
+    - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
+    - sudo docker network inspect network-staging >/dev/null 2>&1 || sudo docker network create network-staging
+    - sudo docker compose -f docker-compose.staging.yml up -d --build
+  only:
+    - staging
+
+staging_integration_tests:
+  stage: staging-integration-tests
+  image: gradle:8.3
+  tags: [docker]
+  script:
+    - cd backend && gradle clean test --tests "*IntegrationTest"
+  only:
+    - staging
+
+staging_acceptance_tests:
+  stage: staging-acceptance-tests
+  image: node:22
+  tags: [docker]
+  variables:
+    BASE_URL: "http://host.docker.internal:3002"
+  script:
+    - cd frontend && npm ci --legacy-peer-deps
+    - npx playwright install --with-deps
+    - npm run test:e2e:ci
+  only:
+    - staging
+
+prod_deploy:
+  stage: prod-deploy
+  tags: [shell]
+  script:
+    - sudo mkdir -p /srv/app/prod
+    - cd /srv/app/prod
+    - sudo rm -rf see
+    - sudo git clone --branch prod http://192.168.56.9/student/see.git
+    - cd see/infrastructure
+    - sudo docker compose -f docker-compose.prod.yml down
+    - if [ "$(sudo docker ps -aq -f status=exited)" ]; then sudo docker rm $(sudo docker ps -aq -f status=exited); fi
+    - sudo docker network inspect network-prod >/dev/null 2>&1 || sudo docker network create network-prod
+    - sudo docker compose -f docker-compose.prod.yml up -d --build
+  only:
+    - prod

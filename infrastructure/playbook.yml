@@ -1,0 +1,303 @@
+---
+- name: Install Docker, GitLab, and GitLab Runner on Ubuntu
+  hosts: all
+  become: yes
+
+  vars:
+    gitlab_external_url: "http://192.168.56.9"
+    gitlab_student_repo_url: "http://student:xxcc0xxcc@192.168.56.9"
+
+  tasks:
+    ###########################################################################
+    # Install dependencies
+    ###########################################################################
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - git
+        state: present
+        update_cache: yes
+
+    ###########################################################################
+    # Install docker
+    ###########################################################################
+    - name: Update repositories cache.
+      apt:
+        update_cache: yes
+
+    - name: Safe system upgrade via aptitude.
+      apt:
+        upgrade: safe
+
+    - name: Install packages required by Docker.
+      apt:
+        name: "{{ packages }}"
+      vars:
+        packages:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update repositories cache.
+      apt:
+        update_cache: yes
+
+    - name: Install Docker packages.
+      apt:
+        name: "{{ dockerpackages }}"
+      vars:
+        dockerpackages:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+
+    - name: Add users to docker group.
+      shell: "usermod -aG docker {{ item }}"
+      with_items:
+        - vagrant
+
+    - name: Enable/start Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    ###########################################################################
+    # Install gitlab
+    ###########################################################################
+    - name: Add GitLab repository installer script
+      get_url:
+        url: https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
+        dest: /tmp/gitlab_install.sh
+        mode: "0755"
+
+    - name: Run GitLab repo installer
+      command: bash /tmp/gitlab_install.sh
+
+    - name: Install GitLab CE
+      apt:
+        name: gitlab-ce
+        state: latest
+
+    - name: Configure GitLab external URL
+      lineinfile:
+        path: /etc/gitlab/gitlab.rb
+        regexp: "^external_url"
+        line: "external_url '{{ gitlab_external_url }}'"
+
+    - name: Reconfigure GitLab (runs chef automation)
+      command: gitlab-ctl reconfigure
+
+    ###########################################################################
+    # Install gitlab runner
+    ###########################################################################
+    - name: Add gitlab runner repository installer script
+      get_url:
+        url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh
+        dest: /tmp/gitlab_runner_install.sh
+        mode: "0755"
+
+    - name: Run gitlab runner repo installer
+      command: bash /tmp/gitlab_runner_install.sh
+
+    - name: Install gitlab runner
+      apt:
+        name: gitlab-runner
+        state: latest
+
+    - name: Allow gitlab-runner passwordless sudo (required for shell-runner deploy jobs)
+      copy:
+        dest: /etc/sudoers.d/gitlab-runner
+        owner: root
+        group: root
+        mode: "0440"
+        content: |
+          gitlab-runner ALL=(ALL) NOPASSWD:ALL
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Ensure gitlab runner service is running
+      service:
+        name: gitlab-runner
+        state: started
+        enabled: yes
+
+    ###########################################################################
+    # Change the root user password in gitlab
+    ###########################################################################
+    - name: Change root user password
+      shell: |
+        cat >/tmp/change_root_password.rb <<'RUBY'
+        u = User.where(id: 1).first
+        u.password = 'xxcc0xxcc'
+        u.password_confirmation = 'xxcc0xxcc'
+        u.save!
+        RUBY
+        sudo -n gitlab-rails runner /tmp/change_root_password.rb
+
+    ###########################################################################
+    # Create a user in gitlab
+    ###########################################################################
+    - name: Create 'student' user in gitlab
+      shell: |
+        cat >/tmp/create_student_user.rb <<'RUBY'
+        u = User.new(username: 'student', email: 'student@uni.lu', name: 'Student', password: 'xxcc0xxcc', password_confirmation: 'xxcc0xxcc')
+        u.assign_personal_namespace(Organizations::Organization.default_organization)
+        u.skip_confirmation!
+        u.save!
+        RUBY
+        sudo -n gitlab-rails runner /tmp/create_student_user.rb
+
+    ###########################################################################
+    # Create a project in gitlab
+    ###########################################################################
+    - name: Create 'see' project in gitlab
+      shell: |
+        cat >/tmp/create_student_project.rb <<'RUBY'
+        u = User.find_by(username: 'student')
+        p = Projects::CreateService.new(u, name: 'see', path: 'see', visibility_level: Gitlab::VisibilityLevel::PUBLIC).execute
+        RUBY
+        sudo -n gitlab-rails runner /tmp/create_student_project.rb
+
+    ###########################################################################
+    # Register gitlab runner
+    ###########################################################################
+    - name: Ensure gitlab-runner user can access Docker
+      shell: |
+        usermod -aG docker gitlab-runner
+
+    - name: Restart gitlab runner (pick up docker group membership)
+      service:
+        name: gitlab-runner
+        state: restarted
+
+    - name: Fetch project runner registration token for student/see
+      shell: |
+        sudo -n gitlab-rails runner "p = Project.find_by_full_path('student/see'); raise 'project student/see missing' if p.nil?; puts p.runners_token"
+      register: gitlab_student_project_runner_token
+      changed_when: false
+
+    - name: Register gitlab runner for student/see (docker executor)
+      shell: |
+        set -eu
+        # In config.toml the runner "description" is stored as `name = "..."`
+        if sudo -n test -f /etc/gitlab-runner/config.toml && sudo -n grep -q 'name = "student-project-docker-runner"' /etc/gitlab-runner/config.toml; then
+          echo "already"
+          exit 0
+        fi
+        sudo -n gitlab-runner register \
+          --non-interactive \
+          --url "{{ gitlab_external_url }}" \
+          --registration-token "{{ gitlab_student_project_runner_token.stdout | trim }}" \
+          --executor "docker" \
+          --description "student-project-docker-runner" \
+          --tag-list "docker" \
+          --docker-image "alpine:latest" \
+          --docker-privileged "true" \
+          --run-untagged="false" \
+      register: gitlab_runner_register
+      changed_when: "'already' not in gitlab_runner_register.stdout"
+
+    # Even if the runner is already registered, enforce the mapping in config.toml.
+    # This makes host.docker.internal resolve on Linux GitLab Docker runners.
+    - name: Ensure docker runner has host.docker.internal -> host-gateway mapping in config.toml
+      shell: |
+        set -eu
+        CFG="/etc/gitlab-runner/config.toml"
+        LINE='    extra_hosts = ["host.docker.internal:host-gateway"]'
+
+        # Idempotent: do nothing if already present.
+        if sudo -n grep -qF "$LINE" "$CFG"; then
+          exit 0
+        fi
+
+        # Ensure the target section exists (we insert under the first [runners.docker]).
+        if ! sudo -n grep -qE '^\s*\[runners\.docker\]\s*$' "$CFG"; then
+          echo "ERROR: could not find [runners.docker] section in $CFG" >&2
+          exit 1
+        fi
+
+        TMP="$(mktemp)"
+        # Insert LINE immediately after the first [runners.docker] header.
+        sudo -n awk -v line="$LINE" '
+          BEGIN { inserted=0 }
+          {
+            print
+            if (!inserted && $0 ~ /^[[:space:]]*\[runners\.docker\][[:space:]]*$/) {
+              print line
+              inserted=1
+            }
+          }
+        ' "$CFG" > "$TMP"
+        sudo -n mv "$TMP" "$CFG"
+
+    - name: Register gitlab runner for student/see (shell executor)
+      shell: |
+        set -eu
+        # In config.toml the runner "description" is stored as `name = "..."`
+        if sudo -n test -f /etc/gitlab-runner/config.toml && sudo -n grep -q 'name = "student-project-shell-runner"' /etc/gitlab-runner/config.toml; then
+          echo "already"
+          exit 0
+        fi
+        sudo -n gitlab-runner register \
+          --non-interactive \
+          --url "{{ gitlab_external_url }}" \
+          --registration-token "{{ gitlab_student_project_runner_token.stdout | trim }}" \
+          --executor "shell" \
+          --description "student-project-shell-runner" \
+          --tag-list "shell" \
+          --run-untagged="false"
+      register: gitlab_runner_shell_register
+      changed_when: "'already' not in gitlab_runner_shell_register.stdout"
+
+    - name: Restart gitlab runner (apply config.toml changes)
+      service:
+        name: gitlab-runner
+        state: restarted
+
+    ###########################################################################
+    # Push and deploy 'see' repository
+    ###########################################################################
+    - name: Clone 'see' repository from github
+      shell: |
+        rm -rf /srv/see
+        git clone --branch main --single-branch https://github.com/iparsrc/see.git /srv/see
+
+    - name: Configure git
+      shell: |
+        git config --global user.name student
+        git config --global user.email student@uni.lu
+
+    - name: Push 'see' repository to gitlab
+      shell: |
+        cd /srv/see
+        git remote set-url origin "{{ gitlab_student_repo_url }}/student/see.git"
+        git push -u origin main
+
+    - name: Trigger jobs
+      shell: |
+        cd /srv/see
+        git checkout -B dev
+        git push origin dev
+        git checkout -B staging
+        git push origin staging
+        git checkout -B prod
+        git push origin prod

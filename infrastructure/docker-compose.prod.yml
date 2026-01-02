@@ -1,0 +1,57 @@
+networks:
+  network-prod:
+    external: true
+
+services:
+  db-prod:
+    image: mariadb:10.4.7
+    container_name: e4l-db-prod
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=e4l
+      - MYSQL_USER=e4l
+      - MYSQL_PASSWORD=e4lpass
+      - TZ=Europe/Luxembourg
+    volumes:
+      - db_data_prod:/var/lib/mysql
+    networks:
+      - network-prod
+    restart: unless-stopped
+
+  backend-prod:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: e4l-backend-prod
+    environment:
+      - DEV_SPRING_DATASOURCE_URL=jdbc:mysql://db-prod:3306/e4l?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - DEV_SPRING_DATASOURCE_USERNAME=e4l
+      - DEV_SPRING_DATASOURCE_PASSWORD=e4lpass
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.MariaDB103Dialect
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - JWT_SECRET=devsecret
+      - SIGNATURE_KEY=devsign
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=adminpass
+      - DEV_RESOURCES_STATIC_URL=http://192.168.56.9:9001/e4lapi/
+    ports:
+      - "9001:8080"
+    networks:
+      - network-prod
+    restart: unless-stopped
+
+  frontend-prod:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        API_URL: http://192.168.56.9:9001/e4lapi
+    container_name: e4l-frontend-prod
+    ports:
+      - "9002:80"
+    networks:
+      - network-prod
+    restart: unless-stopped
+
+volumes:
+  db_data_prod:
