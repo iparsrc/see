@@ -17,9 +17,12 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY . .
+# docker-compose passes `build.args.API_URL`; webpack uses dotenv-webpack (reads `.env`)
+ARG API_URL
+RUN if [ -n "${API_URL:-}" ]; then echo "API_URL=${API_URL}" > .env; fi
 RUN npm run build
 
 
